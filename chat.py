@@ -46,8 +46,7 @@ class Chat:
         hostname: str = socket.gethostname()
         ip_addresses = socket.gethostbyname_ex(hostname)[-1]
         if len(ip_addresses) > 1:
-            # TODO: lookup why this happens ?
-            ipaddress: str = socket.gethostbyname_ex(hostname)[-1][1]
+             ipaddress: str = socket.gethostbyname_ex(hostname)[-1][1]
         else:
             ipaddress: str = socket.gethostbyname_ex(hostname)[-1][0]
         logging.info(f"Resolved whoami. IP:{ipaddress} \t Hostname:{hostname}")
@@ -125,9 +124,7 @@ class Chat:
                     # rest as content
                         content = line.split(" ", 1)[1]
                         content = content.strip()
-                        for peer in self.peers.keys():
-                            threading.Thread(target=lambda: self.send_message(
-                                peer, MessageType.message, content=content)).start()
+                        self.send_all(MessageType.message, content=content)
                     elif line.startswith(":send_to"):
                         name, content = line.split(
                             " ", 2)[1], line.split(
@@ -185,6 +182,12 @@ class Chat:
                 logging.info(f"Closed the connection on {ip}")
         except Exception as e:
             logging.error(f"Error while sending the message. Reason: {e}")
+    
+    def send_all(self, type: MessageType, content: str = None):
+        for peer in self.peers.keys():
+            if peer != self.whoami["ip"]:
+                threading.Thread(target=lambda: self.send_message(
+                    peer, type, content)).start()
 
     def process_message(self, data: str, ip: str):
         data = json.loads(data)

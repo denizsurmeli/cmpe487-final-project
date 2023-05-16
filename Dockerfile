@@ -1,5 +1,5 @@
 FROM ubuntu:latest
 RUN apt-get update && apt-get install -qq -y python3
-COPY ./netchat.py /home/.
+COPY ./chat.py /home/.
 
 WORKDIR /home/.

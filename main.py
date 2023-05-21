@@ -1,5 +1,6 @@
 import os
-import threading
+from communicator import Communicator
+from initializer import Initializer
 
 def parse_ip_addr():
     fmsg = os.popen("ip -o addr | awk '/inet/ {print $2, $3, $4}'").read()
@@ -30,22 +31,11 @@ if __name__ == "__main__":
             break
         print("Please enter a valid name!")
 
-    # Start listening to port
-    read_thread = threading.Thread(target=recv_msg, daemon=True)
-    read_thread.start()
+    comm = Communicator(myip, myname)
+    Initializer(comm)
 
-    # Get greeting from other peers
-    broadcast_thread = threading.Thread(target=recv_broadcast, daemon=True)
-    broadcast_thread.start()
-
-    # Discover other peers
-    discover_thread = threading.Thread(target=discover_nodes, daemon=True)
-    discover_thread.start()
-
-    # Periodic cleanup service
-    cleanup_thread = threading.Thread(target=cleanup_service, daemon=True)
-    cleanup_thread.start()
-
+    # For referance
+    """
     while True:
         curmsg = input().partition(":")
         tgt_ip=None
@@ -58,3 +48,4 @@ if __name__ == "__main__":
             send_msg(tgt_ip, curmsg[2].strip())
         else:
             print("This person does not exists!")
+    """

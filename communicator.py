@@ -5,22 +5,19 @@ import socket
 import time
 
 class Communicator:
-    PORT = 12345
-    BUFFERSIZE = 1024
-    persons = {} # ip -> name
-    persons_lock = threading.Lock()
-    ttl = {} # ip -> time
-    ttl_lock = threading.Lock()
-    ips = {} # name -> ip
-    ips_lock = threading.Lock()
-    recv_parser = lambda fmsg, addr: None
-    recv_parser_lock = threading.Lock()
-    myip = None
-    myname = None
-
     def __init__(self, myip, myname):
+        self.PORT = 12345
+        self.BUFFERSIZE = 1024
         self.myname = myname
         self.myip = myip
+        self.persons = {} # ip -> name
+        self.ttl = {} # ip -> time
+        self.ips = {} # name -> ip
+        self.persons_lock = threading.Lock()
+        self.recv_parser = lambda fmsg, addr: None
+        self.recv_parser_lock = threading.Lock()
+        self.discovery_exit = threading.Event()
+        self.cleanup_exit = threading.Event()
 
         # Start listening to port
         read_thread = threading.Thread(target=self.recv_msg, daemon=True)
@@ -35,21 +32,22 @@ class Communicator:
         #discover_thread.start()
 
         # Periodic cleanup service
-        cleanup_thread = threading.Thread(target=self.cleanup_service, daemon=True)
-        cleanup_thread.start()
+        #cleanup_thread = threading.Thread(target=self.cleanup_service, daemon=True)
+        #cleanup_thread.start()
 
     def recv_parser_change(self, new_func):
         with self.recv_parser_lock:
             self.recv_parser = new_func
 
     def add_person(self, name, ip):
-        with self.ttl_lock: self.ttl[ip] = time.time()
         # Prevent double addition, person already added
         with self.persons_lock:
+            self.ttl[ip] = time.time()
             if ip in self.persons.keys():
-                return
+                return False
             self.persons[ip] = name
-        with self.ips_lock: self.ips[name] = ip
+            self.ips[name] = ip
+        return True
     
     def socket_send(self, host, msg):
         try:
@@ -96,28 +94,24 @@ class Communicator:
                     continue
                 threading.Thread(target=self.recv_parser, args=(data.decode('UTF-8'), addr[0]), daemon=True).start()
 
-    def discover_nodes(self):
-        print("Started node discovery...")
-        hello_msg = json.dumps({"type": "hello", "myname": self.myname})
+    def discover_nodes(self, msg):
         # Discover for ever
-        while True:
-            self.broadcast_send(hello_msg)
-            time.sleep(60)
+        while not self.discovery_exit.wait(60):
+            self.broadcast_send(msg)
 
     # Remove expired ips
-    def cleanup_service(self):
-        while True:
-            to_remove = []
-            with self.persons_lock:
-                for ip in self.persons.keys():
-                    if self.ttl[ip] + 120 < time.time():
-                        to_remove.append(ip)
-            with self.persons_lock, self.ips_lock, self.ttl_lock:
-                for ip in to_remove:
+    def cleanup_service(self, post_function = lambda name, ip: print(name, "left.")):
+        while not self.cleanup_exit.wait(11):
+            self.remove_persons(lambda ip: self.ttl[ip] + 120 < time.time(), post_function)
+
+    def remove_persons(self, if_function = lambda ip: True, post_function = lambda name, ip: None):
+        with self.persons_lock:
+            for ip in self.persons.keys():
+                if if_function(ip):
                     name = self.persons[ip]
                     self.ttl.pop(ip)
                     self.persons.pop(ip)
                     self.ips.pop(name)
-                    print(name, "left.")
-            to_remove.clear()
-            time.sleep(9) # Check for expired ttls for every 9 seconds
+                    post_function(name, ip)
+
+    

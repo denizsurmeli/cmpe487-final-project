@@ -21,6 +21,8 @@ if __name__ == "__main__":
         print(it, "-", interfaces[it])
 
     choice = int(input("Choice: "))
+    while not 0 <= choice < len(interfaces):
+        choice = int(input("Please enter a valid range: "))
 
     myip = interfaces[choice]["ip"]
     print("Selected ip", myip)
@@ -32,7 +34,7 @@ if __name__ == "__main__":
         print("Please enter a valid name!")
 
     comm = Communicator(myip, myname)
-    Initializer(comm)
+    variables = Initializer(comm).information()
 
     # For referance
     """

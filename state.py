@@ -26,11 +26,14 @@ class Partition(enum.Enum):
 class State:
     def __init__(self, players: list[Player]):
         self.players = players # we don't drop the players from the list even though they are alive or not
-        self.round :int = 0
+        self.round :int = 1
         self.partition :Partition = Partition.day
         self.partition_lock = threading.Lock()
 
-        # TODO : Is this a good way to do this? Discuss.
+        # This map is persistent, others are renewed every round.
+        self.is_alive = dict()
+        self.is_alive_lock = threading.Lock()
+
         self.votes = dict()
         self.votes_lock = threading.Lock()
 
@@ -40,8 +43,7 @@ class State:
         self.saved = dict()
         self.saved_lock = threading.Lock()
 
-        self.is_alive = dict()
-        self.is_alive_lock = threading.Lock()
+
 
 
     def vote(self, player, vote):
@@ -72,6 +74,16 @@ class State:
             return True
         else:
             return False
+        
+    def round_cleanup(self):
+        with self.votes_lock:
+            self.votes = dict()
+        with self.killed_lock:
+            self.killed = dict()
+        with self.saved_lock:
+            self.saved = dict()
+        self.round += 1
+        self.change_state(Partition.day)
         
         
         

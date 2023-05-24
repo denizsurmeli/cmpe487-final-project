@@ -17,14 +17,21 @@ class Partition(enum.Enum):
     end_of_voting = 4
     end = 5
 
-
+def parse_role(role: str) -> Role:
+    if role == "vampire":
+        return Role.vampire
+    elif role == "doctor":
+        return Role.doctor
+    else:
+        return Role.villager
+    
 class Player: 
     def __init__(self, data: dict):
         self.ip = data["ip"]
         self.id = data["id"] # TODO: Maybe we won't need this, wrapping up just in case. 
         self.name = data["name"]
         # TODO: Do we need to remove these ?
-        self.role = data["role"]
+        self.role = parse_role(data["role"])
         self.key = data["key"]
     
 

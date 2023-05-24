@@ -91,7 +91,10 @@ class House:
                     self.communicator.socket_send(ip, message)
 
     def vote(self, executor:Player ,player: Player, vote: Player):
-        with self.state_lock:
+        with self.state_lock, self.state.alive_lock:
+            if vote.ip not in self.state.alive.keys():
+                print("ERROR: Player", vote.name, "is not alive.")
+                return
             if self.is_open and time.time() - self.started_at < VOTING_PERIOD:
                 # vampire mind control case
                 if executor.ip != player.ip and executor.role == Role.vampire:

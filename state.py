@@ -33,7 +33,7 @@ class State:
         self.partition :Partition = Partition.day
         self.partition_lock = threading.Lock()
 
-        # This map is persistent, others are renewed every round.
+        # This map is persistent, others are renewed every loop.
         self.is_alive = dict()
         self.is_alive_lock = threading.Lock()
 

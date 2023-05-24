@@ -34,7 +34,7 @@ class State:
         # This map is persistent, others are renewed every round.
         self.is_alive = dict()
         self.is_alive_lock = threading.Lock()
-        
+
         self.killed = dict()
         self.killed_lock = threading.Lock()
 
@@ -56,15 +56,17 @@ class State:
             self.saved[player] = True
 
     def is_over(self):
-        # if the number of alive 
+        # if the number of alive people <= number of alive vampires, vampires win
         with self.is_alive_lock:
             alive_people_count = len([player for player, state in self.is_alive.items() if state and player.role != Role.vampire])
             alive_vampire_count = len([player for player, state in self.is_alive.items() if state and player.role == Role.vampire])
 
         if alive_people_count <= alive_vampire_count:
-            return True
+            return (True, Role.vampire)
+        elif alive_vampire_count == 0:
+            return (True, Role.villager)
         else:
-            return False
+            return (False, None)
         
     def round_cleanup(self):
         with self.killed_lock:

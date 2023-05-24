@@ -10,6 +10,12 @@ class Role(enum.Enum):
     doctor = 2
     villager = 3
 
+class Partition(enum.Enum):
+    day = 1
+    night = 2
+    voting = 3
+    end = 4
+
 class Player: 
     def __init__(self, data: dict):
         self.ip = data["ip"]
@@ -18,11 +24,7 @@ class Player:
         self.role = data["role"]
         self.key = data["key"]
     
-class Partition(enum.Enum):
-    day = 1
-    night = 2
-    voting = 3
-    end = 4
+
 
 class State:
     def __init__(self, players: list[Player]):

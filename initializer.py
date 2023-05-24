@@ -427,4 +427,3 @@ class Initializer:
                             self.complete.set()
                 else:
                     self.complete.set()
-                

@@ -35,6 +35,9 @@ class State:
         self.is_alive = dict()
         self.is_alive_lock = threading.Lock()
 
+        self.protected = dict()
+        self.protected_lock = threading.Lock()
+
         self.killed = dict()
         self.killed_lock = threading.Lock()
 
@@ -46,14 +49,19 @@ class State:
             self.partition = partition
     
     def kill(self, player):
-        with self.killed_lock:
-            self.killed[player] = True
-        with self.is_alive_lock:
-            self.is_alive[player] = False
+        with self.killed_lock, self.protected_lock, self.is_alive_lock:
+            if player not in self.protected:
+                self.killed[player] = True
+                self.is_alive[player] = False
+                self.save(player)
     
     def save(self, player):
         with self.saved_lock:
             self.saved[player] = True
+
+    def protect(self, player):
+        with self.protected_lock:
+            self.protected[player] = True
 
     def is_over(self):
         # if the number of alive people <= number of alive vampires, vampires win

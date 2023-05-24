@@ -17,7 +17,7 @@ HELLO_GAME_MESSAGE = {
     "total": 0,
     "vampire": 0,
     "doctor": 0,
-    "current": 0,
+    "current": 1, # Distributor themselves are also a player
     "myname": ""
 }
 
@@ -131,6 +131,7 @@ class Initializer:
         self.roles_lock = threading.Lock()
         self.role = None
         self.role_lock = threading.Lock()
+        self.distributor = None
         self.choice = int(input("Setup modes:\n1 for founder\n2 for joiner\nChoice: "))
         while not 1 <= self.choice <= 2:
             self.choice = int(input("Please enter a valid range: "))
@@ -175,13 +176,35 @@ class Initializer:
                 print("Wait for accept:")
                 self.answer.wait()
                 if self.accepted:
+                    print("Accepted")
+                    self.distributor = self.comm.persons[choice]
                     break
                 print("Rejected.")
                 self.answer.clear()
             self.stage2.wait()
             with self.player_lock:
-                random.shuffle(self.player_lock)
-
+                random.shuffle(self.players)
+                self.players.append(self.distributor)
+                cur_role = 0
+                for player in self.players:
+                    self.asked = player[1]
+                    self.comm.socket_send(player[1])
+                    self.asked_receive.wait()
+                    self.asked_receive.clear()
+                    if self.asked:
+                        msg = STAGE2_ROLE_MESSAGE
+                        msg["number"] = list(self.roles.keys())[cur_role]
+                        msg["role"] = self.roles[msg["number"]]
+                        self.comm.socket_send(player[1], msg)
+                        cur_role+=1
+                        print("Sent role to", self.player[0])
+                        if len(self.roles)>=cur_role:
+                            break
+                        continue
+                    self.asked_receive.clear()
+                    print(self.player[0], "already received role")
+                self.players.pop()
+                self.comm.socket_send(self.distributor[1], STAGE2_END_MESSAGE)
         else:
             self.stage=1
             with self.player_lock:
@@ -196,6 +219,9 @@ class Initializer:
                     self.comm.socket_send(player[1], STAGE0_END_MESSAGE)
                 self.comm.cleanup_exit.set()
                 self.comm.discovery_exit.set()
+
+                # First one should send 2 because distributor cant send at stage 2
+                self.players.append(self.players[0])
 
                 for role_player, role in zip(self.players, role_list):
                     key = Fernet.generate_key()
@@ -214,10 +240,15 @@ class Initializer:
                         self.comm.socket_send(key_player[1], msg)
                         
                     cur += 1
+                self.players.pop()
                 self.stage=2
                 for player in self.players:
                     self.comm.socket_send(player[1], STAGE1_END_MESSAGE)
-
+        print("Transfers completed:", self.players)
+        self.complete.wait()
+        print("All completed:", self.role)
+        return self.players, self.role
+                
 
     def recv_parser(self, fmsg, ip):
         fmsg = json.loads(fmsg)
@@ -279,11 +310,11 @@ class Initializer:
         elif self.stage==1:
             if fmsg["type"] == "role":
                 with self.roles_lock:
-                    self.roles[fmsg["number"]]=base64.b64decode(fmsg["role"]).decode()
+                    self.roles[fmsg["number"]]=fmsg["role"]
                 return
             if fmsg["type"] == "key":
                 with self.keys_lock:
-                    self.roles[fmsg["number"]]=base64.b64decode(fmsg["key"]).decode()
+                    self.roles[fmsg["number"]]=base64.b64decode(fmsg["key"])
                 return
             if fmsg["type"] == "end":
                 self.stage = 2
@@ -305,3 +336,23 @@ class Initializer:
                         self.comm.socket_send(ip, STAGE2_SEND_ACPT_MESSAGE)
                     else: 
                         self.comm.socket_send(ip, STAGE2_SEND_RJCK_MESSAGE)
+            if fmsg["type"] == "send_acpt":
+                self.asked = True
+                self.asked_receive.set()
+            if fmsg["type"] == "send_rjck":
+                self.asked = False
+                self.asked_receive.set()
+            if fmsg["type"] == "role":
+                self.role=Fernet(self.keys[fmsg["number"]]).decrypt(base64.b64decode(fmsg["role"])).decode()
+            if fmsg["type"] == "end":
+                if self.choice == 1:
+                    with self.counter_lock:
+                        self.counter+=1
+                        if self.counter >= len(self.players):
+                            self.complete.set()
+                            with self.player_lock:
+                                for person in self.persons:
+                                    self.comm.socket_send(person[1], STAGE2_END_MESSAGE)
+                else:
+                    self.complete.set()
+                

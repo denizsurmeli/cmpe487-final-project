@@ -34,7 +34,9 @@ if __name__ == "__main__":
         print("Please enter a valid name!")
 
     comm = Communicator(myip, myname)
+    # List(name:str, ip:str), role:str
     variables = Initializer(comm).information()
+    print("Got variables:", variables)
 
     # For referance
     """

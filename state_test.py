@@ -91,8 +91,6 @@ class TestState(unittest.TestCase):
         self.assertFalse(is_over)
         self.assertTrue(side == None)    
 
-
-
         # game is over in this round
         self.state.change_state(Partition.night)
         # kill all vampires except remain none
@@ -104,6 +102,34 @@ class TestState(unittest.TestCase):
 
         self.assertTrue(is_over)
         self.assertTrue(side == Role.villager)
+
+    def test_cleanup(self):
+        self.state.protect(self.state.players[0])
+
+        self.state.change_state(Partition.night)
+        self.state.kill(self.state.players[0])
+        self.state.kill(self.state.players[1])
+        self.state.kill(self.state.players[2])
+
+        self.state.change_state(Partition.end_of_voting)
+        dump = self.state.dump_state_change()
+        self.state.round_cleanup()
+        
+        for i in range(3, 10):
+            self.assertTrue(self.state.alive[self.state.players[i]])
+        
+        self.assertTrue(dump["saved"] == [self.state.players[0]])
+        self.assertTrue(dump["killed"] == [self.state.players[1], self.state.players[2]])
+        print(self.state.saved, self.state.killed)
+        self.assertTrue(len(self.state.saved) == 0)
+        self.assertTrue(len(self.state.killed) == 0)
+        
+        
+
+
+
+
+
 
 
     

@@ -110,6 +110,14 @@ class State:
                 self.change_state(Partition.day)
                 self.round += 1
 
+    def dump_state_change(self):
+        if self.partition == Partition.end_of_voting:
+            with self.killed_lock, self.saved_lock:
+                dump = {
+                    "killed": [player for player,state in self.killed.items() if state],
+                    "saved": [player for player,state in self.saved.items() if state]
+                }
+            return dump
         
         
 

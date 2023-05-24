@@ -64,6 +64,8 @@ class House:
         # After listening the intermediate period, we finalize the votes by looking at the whispers and broadcasts
         # and make the final call for each peer. This updates the state to the final period of voting, 
         # the ones that need to be killed are killed etc. 
+
+        # NOTE: The ip's are the the ip's of the **voters**
         self.whispers = {player.ip: dict() for player in alive_players} # ip -> votes -> whisper_count
         self.whispers_lock = threading.Lock()
 
@@ -91,13 +93,14 @@ class House:
     def vote(self, executor:Player ,player: Player, vote: Player):
         with self.state_lock:
             if self.is_open and time.time() - self.started_at < VOTING_PERIOD:
+                # vampire mind control case
                 if executor.ip != player.ip and executor.role == Role.vampire:
-                    # vampire mind control case
                     message = VOTE_MESSAGE.copy()
                     message["voter"] = player.name
                     message["choice"] = vote.name
                     message["medium"] = "broadcast"
                     self.communicator.socket_send_all(message)
+                # plain voting case
                 elif executor.ip == player.ip:
                     self._vote(player, vote)
                 else:
@@ -109,7 +112,8 @@ class House:
             voters = [player for player, state in self.state.is_alive.items() if state]
             # if voting period has passed or everyone has voted, lock the state and finalize the table
             if (time.time() - self.started_at > VOTING_PERIOD) or len(self.broadcasts.keys()) == len(voters):
-                self.is_open = False
+                with self.state_lock:
+                    self.is_open = False
                 self.finalize_table()
 
 
@@ -122,7 +126,7 @@ class House:
                     message = ASK_MESSAGE.copy()
                     message["voter"] = vote.voter
                     self.communicator.socket_send_all(message)
-            
+        # count whispers
         elif vote.medium == "whisper":
             with self.whispers_lock:
                 self.whispers[vote.ip][vote.choice] = self.whispers[vote.ip].get(vote.choice, 0) + 1
@@ -136,6 +140,8 @@ class House:
 
         # Strategy as follows:
         # If there are more than one broadcast for one peer, first, decide for that peer about the vote
+        
+        # NOTE: The ip's are number of votes **for that** ip.
         final_votes = dict() # ip -> vote
         with self.broadcasts_lock:
             for ip, votes in self.broadcasts.items():
@@ -168,6 +174,7 @@ class House:
         if time.time() - self.started_at > VOTING_PERIOD:
             with self.state_lock:
                 self.is_open = False
+            self.state.change_state(Partition.end_of_voting)
         return self.is_open
 
 

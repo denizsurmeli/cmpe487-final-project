@@ -33,6 +33,12 @@ class Player:
         # TODO: Do we need to remove these ?
         self.role = parse_role(data["role"])
         self.key = data["key"]
+
+    def __eq__(self, other):
+        return self.ip == other.ip and self.id == other.id
+    
+    def __hash__(self):
+        return hash((self.ip, self.id))
     
 
 
@@ -61,26 +67,28 @@ class State:
             self.partition = partition
     
     def kill(self, player):
-        with self.killed_lock, self.protected_lock, self.alive_lock:
-            if player not in self.protected:
-                self.killed[player] = True
-                self.alive[player] = False
-                self.save(player)
+        if self.partition == Partition.night:
+            with self.killed_lock, self.protected_lock, self.alive_lock:
+                if player not in self.protected.keys():
+                    self.killed[player] = True
+                    self.alive[player] = False
+                else:
+                    self.save(player)
     
     def save(self, player):
         with self.saved_lock:
             self.saved[player] = True
 
     def protect(self, player):
-        with self.protected_lock:
-            self.protected[player] = True
+        if self.partition == Partition.day:
+            with self.protected_lock:
+                self.protected[player] = True
 
     def is_over(self):
         # if the number of alive people <= number of alive vampires, vampires win
         with self.alive_lock:
-            alive_people_count = len([player for player, state in self.alive.items() if state and player.role != Role.vampire])
-            alive_vampire_count = len([player for player, state in self.alive.items() if state and player.role == Role.vampire])
-
+            alive_people_count = len([player for player, state in self.alive.items() if (state and player.role != Role.vampire)])
+            alive_vampire_count = len([player for player, state in self.alive.items() if state]) - alive_people_count
         if alive_people_count <= alive_vampire_count:
             return (True, Role.vampire)
         elif alive_vampire_count == 0:

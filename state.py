@@ -14,13 +14,16 @@ class Partition(enum.Enum):
     day = 1
     night = 2
     voting = 3
-    end = 4
+    end_of_voting = 4
+    end = 5
+
 
 class Player: 
     def __init__(self, data: dict):
         self.ip = data["ip"]
         self.id = data["id"] # TODO: Maybe we won't need this, wrapping up just in case. 
         self.name = data["name"]
+        # TODO: Do we need to remove these ?
         self.role = data["role"]
         self.key = data["key"]
     
@@ -34,13 +37,13 @@ class State:
         self.partition_lock = threading.Lock()
 
         # This map is persistent, others are renewed every loop.
-        self.is_alive = dict()
-        self.is_alive_lock = threading.Lock()
+        self.alive = {player: True for player in players}
+        self.alive_lock = threading.Lock()
 
         self.protected = dict()
         self.protected_lock = threading.Lock()
 
-        self.killed = dict()
+        self.killed = dict() 
         self.killed_lock = threading.Lock()
 
         self.saved = dict()
@@ -51,10 +54,10 @@ class State:
             self.partition = partition
     
     def kill(self, player):
-        with self.killed_lock, self.protected_lock, self.is_alive_lock:
+        with self.killed_lock, self.protected_lock, self.alive_lock:
             if player not in self.protected:
                 self.killed[player] = True
-                self.is_alive[player] = False
+                self.alive[player] = False
                 self.save(player)
     
     def save(self, player):
@@ -67,9 +70,9 @@ class State:
 
     def is_over(self):
         # if the number of alive people <= number of alive vampires, vampires win
-        with self.is_alive_lock:
-            alive_people_count = len([player for player, state in self.is_alive.items() if state and player.role != Role.vampire])
-            alive_vampire_count = len([player for player, state in self.is_alive.items() if state and player.role == Role.vampire])
+        with self.alive_lock:
+            alive_people_count = len([player for player, state in self.alive.items() if state and player.role != Role.vampire])
+            alive_vampire_count = len([player for player, state in self.alive.items() if state and player.role == Role.vampire])
 
         if alive_people_count <= alive_vampire_count:
             return (True, Role.vampire)
@@ -79,13 +82,19 @@ class State:
             return (False, None)
         
     def round_cleanup(self):
-        with self.killed_lock:
-            self.killed = dict()
-        with self.saved_lock:
-            self.saved = dict()
-        self.round += 1
-        self.change_state(Partition.day)
-        
+        # Only when voting period ends
+        if self.partition == Partition.end_of_voting:
+            with self.killed_lock:
+                self.killed = dict()
+            with self.saved_lock:
+                self.saved = dict()
+            # if game is over, change the state to end else rewind to a new round
+            if self.is_over()[0]:
+                self.change_state(Partition.end)
+            else:
+                self.change_state(Partition.day)
+                self.round += 1
+
         
         
 

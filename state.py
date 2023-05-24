@@ -13,6 +13,7 @@ class Role(enum.Enum):
 class Player: 
     def __init__(self, data: dict):
         self.ip = data["ip"]
+        self.id = data["id"] # TODO: Maybe we won't need this, wrapping up just in case. 
         self.name = data["name"]
         self.role = data["role"]
         self.key = data["key"]
@@ -33,22 +34,12 @@ class State:
         # This map is persistent, others are renewed every round.
         self.is_alive = dict()
         self.is_alive_lock = threading.Lock()
-
-        self.votes = dict()
-        self.votes_lock = threading.Lock()
-
+        
         self.killed = dict()
         self.killed_lock = threading.Lock()
 
         self.saved = dict()
         self.saved_lock = threading.Lock()
-
-
-
-
-    def vote(self, player, vote):
-        with self.votes_lock:
-            self.votes[player] = vote
 
     def change_state(self, partition):
         with self.partition_lock:
@@ -76,8 +67,6 @@ class State:
             return False
         
     def round_cleanup(self):
-        with self.votes_lock:
-            self.votes = dict()
         with self.killed_lock:
             self.killed = dict()
         with self.saved_lock:

@@ -53,7 +53,7 @@ class Communicator:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.connect((host, self.PORT))
-                s.sendall(msg.encode('UTF-8'))
+                s.sendall(json.dumps(msg).encode('UTF-8'))
         except Exception as e:
             return False
         return True
@@ -96,8 +96,9 @@ class Communicator:
 
     def discover_nodes(self, msg):
         # Discover for ever
+        self.broadcast_send(json.dumps(msg))
         while not self.discovery_exit.wait(60):
-            self.broadcast_send(msg)
+            self.broadcast_send(json.dumps(msg))
 
     # Remove expired ips
     def cleanup_service(self, post_function = lambda name, ip: print(name, "left.")):
@@ -106,7 +107,7 @@ class Communicator:
 
     def remove_persons(self, if_function = lambda ip: True, post_function = lambda name, ip: None):
         with self.persons_lock:
-            for ip in self.persons.keys():
+            for ip in list(self.persons.keys()):
                 if if_function(ip):
                     name = self.persons[ip]
                     self.ttl.pop(ip)

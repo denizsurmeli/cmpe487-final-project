@@ -114,7 +114,7 @@ class TestState(unittest.TestCase):
         self.state.change_state(Partition.end_of_voting)
         dump = self.state.dump_state_change()
         self.state.round_cleanup()
-        
+
         for i in range(3, 10):
             self.assertTrue(self.state.alive[self.state.players[i]])
         
@@ -125,13 +125,8 @@ class TestState(unittest.TestCase):
         self.assertTrue(len(self.state.killed) == 0)
         
         
-
-
-
-
-
-
-
+if __name__ == '__main__':
+    unittest.main()
     
 
 

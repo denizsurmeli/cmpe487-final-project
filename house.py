@@ -46,8 +46,12 @@ class House:
         self.communicator = communicator
         self.state = state
 
+        # udpate the state to voting 
         state.change_state(Partition.voting)
+
         self.started_at = time.time()
+        self.is_open = True
+        self.state_lock = threading.Lock()
 
         alive_players = [player for player, state in state.is_alive.items() if state]
 
@@ -85,18 +89,29 @@ class House:
                     self.communicator.socket_send(ip, message)
 
     def vote(self, executor:Player ,player: Player, vote: Player):
-        if executor.ip != player.ip and executor.role == Role.vampire:
-            # vampire mind control case
-            message = VOTE_MESSAGE.copy()
-            message["voter"] = player.name
-            message["choice"] = vote.name
-            message["medium"] = "broadcast"
-            self.communicator.socket_send_all(message)
-        elif executor.ip == player.ip:
-            self._vote(player, vote)
-        else:
-            # TODO: This is for debugging purposes, remove later.
-            print("ERROR: Player", executor.name, "tried to vote for", player.name, "but is not a vampire.")
+        with self.state_lock:
+            if self.is_open and time.time() - self.started_at < VOTING_PERIOD:
+                if executor.ip != player.ip and executor.role == Role.vampire:
+                    # vampire mind control case
+                    message = VOTE_MESSAGE.copy()
+                    message["voter"] = player.name
+                    message["choice"] = vote.name
+                    message["medium"] = "broadcast"
+                    self.communicator.socket_send_all(message)
+                elif executor.ip == player.ip:
+                    self._vote(player, vote)
+                else:
+                    # TODO: This is for debugging purposes, remove later.
+                    print("ERROR: Player", executor.name, "tried to vote for", player.name, "but is not a vampire.")
+            else:
+                print("ERROR: Voting period is over for this round.")
+            
+            voters = [player for player, state in self.state.is_alive.items() if state]
+            # if voting period has passed or everyone has voted, lock the state and finalize the table
+            if (time.time() - self.started_at > VOTING_PERIOD) or len(self.broadcasts.keys()) == len(voters):
+                self.is_open = False
+                self.finalize_table()
+
 
     def process_vote(self, vote: Vote):
         if vote.medium == "broadcast":
@@ -147,6 +162,13 @@ class House:
                 self.state.is_alive[ip] = False
                 self.state.killed[ip] = True
     
+
+    def is_open(self):
+        # Check if the voting is still open
+        if time.time() - self.started_at > VOTING_PERIOD:
+            with self.state_lock:
+                self.is_open = False
+        return self.is_open
 
 
                     

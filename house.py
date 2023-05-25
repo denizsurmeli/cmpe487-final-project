@@ -163,14 +163,17 @@ class House:
             aggregated_result[vote] = aggregated_result.get(vote, 0) + 1
         # The table is finalized, we select the candidates who will get killed.
         max_count = max(aggregated_result.values())
-        # TODO: Talk about the case of ties
         candidates = [id for id, count in aggregated_result.items() if count == max_count]
-        
-        with self.state.killed_lock:
-            for id in candidates:
+
+        # TODO: Refactor this
+        if len(candidates) < 1:
+            with self.state.killed_lock:
+                id = candidates[0]
                 player = self.id_to_player(id)
                 self.state.alive[player] = False
                 self.state.killed[player] = True
+        else:
+            print("ERROR: There are more than one candidates for killing. This round will be skipped.")
 
     def is_open(self):
         # Check if the voting is still open

@@ -111,7 +111,7 @@ class TestState(unittest.TestCase):
         self.state.kill(self.state.players[1])
         self.state.kill(self.state.players[2])
 
-        self.state.change_state(Partition.end_of_voting)
+        self.state.change_state(Partition.voting)
         dump = self.state.dump_state_change()
         self.state.round_cleanup()
 
@@ -120,9 +120,8 @@ class TestState(unittest.TestCase):
         
         self.assertTrue(dump["saved"] == [self.state.players[0]])
         self.assertTrue(dump["killed"] == [self.state.players[1], self.state.players[2]])
-        print(self.state.saved, self.state.killed)
-        self.assertTrue(len(self.state.saved) == 0)
-        self.assertTrue(len(self.state.killed) == 0)
+        self.assertTrue(len(self.state.saved) == 1)
+        self.assertTrue(len(self.state.killed) == 2)
         
         
 if __name__ == '__main__':

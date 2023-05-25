@@ -114,7 +114,7 @@ class State:
                 self.round += 1
 
     def dump_state_change(self):
-        if self.partition == Partition.end_of_voting:
+        if self.partition == Partition.voting:
             with self.killed_lock, self.saved_lock:
                 dump = {
                     "killed": [player for player,state in self.killed.items() if state],

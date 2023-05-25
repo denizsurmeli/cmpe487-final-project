@@ -40,6 +40,9 @@ class Player:
     def __hash__(self):
         return hash((self.ip, self.id))
     
+    def __str__(self):
+        return f"Player {self.name} ({self.ip}:{self.id})"
+    
 
 
 class State:

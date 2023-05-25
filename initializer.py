@@ -270,10 +270,15 @@ class Initializer:
                 self.stage2.wait()
                 print("Stage1 ended, now other nodes will distribute keys...")
                 self.stage=2
-        print("Transfers completed:", self.players)
+        self.comm.remove_persons()
+        with self.player_lock:
+            for person in self.players:
+                self.comm.add_person(person[0], person[1])
+        with self.comm.persons_lock:
+            print("Transfers completed:", self.comm.persons, self.comm.ips)
         self.complete.wait()
         print("All completed:", self.role)
-        return self.players, self.role
+        return self.role
                 
 
     def recv_parser(self, fmsg, ip):

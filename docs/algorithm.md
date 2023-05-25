@@ -16,3 +16,9 @@
     - set state to day
 - If end
     - Broadcast the result
+
+
+### Voting Logic
+- You practically vote as is:
+- Broadcasts: (voter, heard votes, simply a list is sufficient)
+- Whispers: (peers, dictionary of (voter, whom they whispered of))

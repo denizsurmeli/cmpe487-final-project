@@ -5,7 +5,15 @@ Definitions and functionalities of the roles, the game state etc.
 import threading
 import enum
 from utility import parse_role, build_id
+import json
 
+
+STATE_SYNC = {
+    "type": "state_sync",
+    "killed": [],
+    "saved": [],
+    "protected": []
+}
 class Role(enum.Enum):
     vampire = 1
     doctor = 2
@@ -33,7 +41,7 @@ class Player:
         self.ip = data["ip"]
         self.name = data["name"]
         self.id = build_id(self.ip, self.name)
-        # TODO: Do we need to remove these ?
+        
         if "role" in data.keys() and data["role"] is not None:
             self.role = parse_role(data["role"])
         else:
@@ -72,17 +80,38 @@ class State:
         self.saved = dict()
         self.saved_lock = threading.Lock()
 
+        # what have changed in the last day&night
+        self.delta = {"killed":[], "saved":[]}
+        self.delta_lock = threading.Lock()
+
     def change_state(self, partition: Partition):
         with self.partition_lock:
             self.partition = partition
+
+    def sync_delta(self):
+        if self.partition == Partition.prevote:
+            with self.delta_lock:
+                # process the delta
+                for id in self.delta["protected"]:
+                    self.protect(self.players[id])
+                for id in self.delta["killed"]:
+                    self.kill(self.players[id])
+        if self.partition == Partition.postvote:
+            with self.delta_lock:
+                # process the delta
+                for id in self.delta["killed"]:
+                    print(f"Player {id} is killed by the vote.")
+                    self.kill(self.players[id])
     
     def kill(self, player:Player):
         if self.partition == Partition.night:
             with self.killed_lock, self.protected_lock, self.alive_lock:
                 if player not in self.protected.keys():
+                    print(f"Player {player.id} is killed by the vampire.")
                     self.killed[player] = True
                     self.alive[player] = False
                 else:
+                    print(f"Player {player.id} is protected by the doctor.")
                     self.save(player)
     
     def save(self, player):
@@ -109,10 +138,11 @@ class State:
     def round_cleanup(self):
         # Only when voting period ends
         if self.partition == Partition.postvote:
-            with self.killed_lock:
+            with self.killed_lock, self.saved_lock, self.protected_lock, self.delta_lock:
                 self.killed = dict()
-            with self.saved_lock:
                 self.saved = dict()
+                self.protected = dict()
+                self.delta = {"killed":[], "saved":[]}
             # if game is over, change the state to end else rewind to a new round
             if self.is_over()[0]:
                 self.change_state(Partition.end)
@@ -120,17 +150,29 @@ class State:
                 self.change_state(Partition.day)
                 self.round += 1
 
-    def dump_state_change(self):
-        # If the game in voting stage, show who killed and saved last night.
-        if self.partition == Partition.prevote:
+    def dump_delta(self):
+        # If the game is in prevoting stage, show who have been killed and saved last night.
+        if self.partition == Partition.prevote or self.partition == Partition.postvote:
             with self.killed_lock, self.saved_lock:
-                dump = {
-                    "killed": [player for player,state in self.killed.items() if state],
-                    "saved": [player for player,state in self.saved.items() if state]
-                }
-            return dump
-        
-        
+                delta = STATE_SYNC.copy()
+                delta.killed = [player.id for player,state in self.killed.items() if state]
+                delta.saved = [player.id for player,state in self.saved.items() if state]
+                delta.protected = [player.id for player,state in self.protected.items() if state]
+            return delta
 
 
+    def recv_parser(self, message: str, ip: str):
+        # only attached when the game is in prevoting stage
+        try:
+            message = json.loads(message)
+        except:
+            print("FATALERR: Error while unmarshalling the message.")
 
+        with self.partition_lock,self.delta_lock:
+            if self.partition == Partition.prevote and message["type"] == STATE_SYNC["type"]:
+                    self.delta["killed"].append(message["killed"])
+                    self.delta["saved"].append(message["saved"])
+            elif self.partition != Partition.prevote:
+                print("FATALERR: Received state change while not in prevote stage.")
+            else:
+                print("FATALERR: Received unknown message type.")

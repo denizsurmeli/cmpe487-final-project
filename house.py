@@ -204,6 +204,7 @@ class House:
     def recv_parser(self, message: str, ip: str):
         # NOTE: While sending messages, you give dictionaries, but while receiving, you get json strings.
         # parse the message and update the state accordingly
+        # TODO: Add messaging support maybe ? 
         try:
             message = json.loads(message)
         except:

@@ -14,9 +14,10 @@ class Role(enum.Enum):
 class Partition(enum.Enum):
     day = 1
     night = 2
-    voting = 3
-    end_of_voting = 4
-    end = 5
+    prevote = 3
+    voting = 4
+    end_of_voting = 5
+    end = 6
 
 def parse_role(role: str) -> Role:
     if role == "vampire":
@@ -26,7 +27,6 @@ def parse_role(role: str) -> Role:
     else:
         return Role.villager
 
-
 class Player: 
     def __init__(self, data: dict):
         # In the dictionary, it's absolutely necessary to have ip and name, but role is optional
@@ -34,7 +34,7 @@ class Player:
         self.name = data["name"]
         self.id = build_id(self.ip, self.name)
         # TODO: Do we need to remove these ?
-        if "role" in data.keys():
+        if "role" in data.keys() and data["role"] is not None:
             self.role = parse_role(data["role"])
         else:
             self.role = None
@@ -49,6 +49,8 @@ class Player:
         return f"Player {self.name} ({self.ip}:{self.id})"
     
 
+def pair_to_player(ip:str, name:str, role:str = None) -> Player:
+    return Player({"ip": ip, "name": name, "role": role})
 
 class State:
     def __init__(self, players: list[Player]):
@@ -70,7 +72,7 @@ class State:
         self.saved = dict()
         self.saved_lock = threading.Lock()
 
-    def change_state(self, partition):
+    def change_state(self, partition: Partition):
         with self.partition_lock:
             self.partition = partition
     
@@ -119,8 +121,8 @@ class State:
                 self.round += 1
 
     def dump_state_change(self):
-        # If the game in voting stage, show who killed an saved last night.
-        if self.partition == Partition.voting:
+        # If the game in voting stage, show who killed and saved last night.
+        if self.partition == Partition.prevote:
             with self.killed_lock, self.saved_lock:
                 dump = {
                     "killed": [player for player,state in self.killed.items() if state],

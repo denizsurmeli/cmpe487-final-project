@@ -1,6 +1,7 @@
 """
 Functionality for the voting mechanism. 
 """
+import json
 from communicator import Communicator
 from state import State, Player, Role, Partition
 import threading 
@@ -183,6 +184,20 @@ class House:
             self.state.change_state(Partition.end_of_voting)
         return self.open
 
+    def recv_parser(self, message: str, ip: str):
+        # NOTE: While sending messages, you give dictionaries, but while receiving, you get json strings.
+        # parse the message and update the state accordingly
+        try:
+            message = json.loads(message)
+        except:
+            print("ERROR: Could not parse the message:", message)
+            return
+       
+        if message["type"] == "vote":
+            vote = Vote(message)
+            self.process_vote(vote)
+        else:
+            print("ERROR: Unknown message type for parser attached in <house.py>:", message["type"])
 
                     
 

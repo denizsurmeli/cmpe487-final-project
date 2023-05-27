@@ -120,4 +120,8 @@ class Communicator:
                     self.ips.pop(name)
                     post_function(name, ip)
 
+    def dump_addressbook(self):
+        with self.persons_lock:
+            return self.persons.copy()
+
     

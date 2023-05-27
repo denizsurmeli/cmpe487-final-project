@@ -42,6 +42,9 @@ class House:
         self.communicator = communicator
         self.state = state
 
+        # update the parser on the communicator
+        # TODO : Refactor this, add proper mechanism
+        self.communicator.recv_parser_change(self.recv_parser)
         state.change_state(Partition.voting)
 
         self.started_at = time.time()
@@ -67,6 +70,9 @@ class House:
         self.broadcasts = {player.id: list() for player in alive_players} # id -> [votes]
         self.broadcasts_lock = threading.Lock()
 
+        self.has_voted = {player.id: False for player in alive_players} # id -> bool
+        self.has_voted_lock = threading.Lock()
+
     def _vote(self, player: Player, vote: Player):
         message = VOTE_MESSAGE.copy()
         message["voter"] = player.id
@@ -76,6 +82,9 @@ class House:
         # update the client's state 
         with self.broadcasts_lock:
             self.broadcasts[player.id].append(vote.id)
+        
+        with self.has_voted_lock:
+            self.has_voted[player.id] = True
             
         # broadcast the vote
         self.communicator.socket_send_all(VOTE_MESSAGE)
@@ -88,12 +97,17 @@ class House:
                     self.communicator.socket_send(ip, message)
     
 
-
     def vote(self, executor:Player ,player: Player, vote: Player):
         with self.interval_lock, self.state.alive_lock:
             if vote not in self.state.alive.keys():
                 print("ERROR: Player", vote.name, "is not alive.")
                 return
+        
+            with self.has_voted_lock:
+                if executor == player and self.has_voted[executor.id]:
+                    print("ERROR: Player", executor.name, "has already voted.")
+                    return
+
             if self.open and time.time() - self.started_at < VOTING_PERIOD:
                 # vampire mind control case
                 # NOTE: Executor information is only available for the player herself, so no information leak. 
@@ -106,6 +120,9 @@ class House:
 
                     with self.broadcasts_lock:
                         self.broadcasts[player.id].append(vote.id)
+                    
+                    with self.has_voted_lock:
+                        self.has_voted[player.id] = True
                 # plain voting case
                 elif executor.id == player.id:
                     self._vote(player, vote)
@@ -174,14 +191,14 @@ class House:
                 self.state.alive[player] = False
                 self.state.killed[player] = True
         else:
-            print("ERROR: There are more than one candidates for killing. This round will be skipped.")
+            print("ERROR: There are more than one candidates for killing. This round will be skipped with no effects.")
 
     def is_open(self):
         # Check if the voting is still open
         if time.time() - self.started_at > VOTING_PERIOD:
             with self.interval_lock:
                 self.open = False
-            self.state.change_state(Partition.end_of_voting)
+            self.state.change_state(Partition.postvote)
         return self.open
 
     def recv_parser(self, message: str, ip: str):

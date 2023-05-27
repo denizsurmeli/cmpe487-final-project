@@ -1,6 +1,8 @@
+import time
+
 from communicator import Communicator
 from state import State, Partition, Player, Role
-
+from house import House, Vote
 from utility import build_id, recv_parser, GROUP_CHAT_MESSAGE, PRIVATE_CHAT_MESSAGE 
 
 # couple with functions to be called
@@ -12,15 +14,16 @@ COMMANDS = {
     "protect":None,
 }
 
+DAY_PERIOD = 30 # seconds
+NIGHT_PERIOD = 10 # seconds
+VOTING_PERIOD = 30 # seconds
+
 class Game:
     def __init__(self, client: Player, communicator: Communicator, state:State, clock:float):
         self.client = client
         self.clock = clock
         self.communicator = communicator
         self.state = state
-
-        # in the beginnig, parser is set to default.
-        self.communicator.recv_parser_change(lambda message, ip:recv_parser(self=communicator, message=message, ip=ip))
         
         # bind methods to commands
         self.commands = COMMANDS.copy()
@@ -30,29 +33,69 @@ class Game:
         self.commands["kill"] = self.kill
         self.commands["protect"] = self.protect
 
+
     def run(self):
-        # TODO: Implement
-        ### plays the game
-            # the driver logic for the game
-            # day
-                # chat for 30 seconds
-                # only send_all, send, protect
-            # night
-                # vampires can kill in 10 seconds
-                # only kill
+        while self.state.is_over()[0] != True:
+            # always starts with day
+            day_point = time.time()
+            # in the beginnig, parser is set to default.
+            self.communicator.recv_parser_change(lambda message, ip:recv_parser(self=self.communicator, message=message, ip=ip))
+            while time.time() - day_point < DAY_PERIOD:
+                # Do nothing, let people chat
+                pass
+        
+            # change the state to night
+            self.state.change_state(Partition.night)
+            night_point = time.time()
+            # TODO: Change this parser to vampire kill parser
+            self.communicator.recv_parser_change(lambda message, ip:recv_parser(self=self.communicator, message=message, ip=ip))
+            while time.time() - night_point < NIGHT_PERIOD:
+                # Do nothing, let vampires kill
+                pass
+            
+            # prevote
+            self.state.change_state(Partition.prevote)
+            self.communicator.recv_parser_change(self.state.recv_parser)
+            # distribute delta among peers 
+            state_delta = self.state.dump_delta()
+            self.communicator.socket_send_all(state_delta)
+
+            # let all peers catchup
+            print("Waiting for peers to catch up...")
+            time.sleep(5)
+            print("Done")
+
+            self.state.sync_delta()
+
             # voting
-                # create house
-                    # update state to prevote
-                # anounce the deaths and protected one
-                # discussion for 30 seconds
-                # update the state to vote
-                # voting for 30 seconds
-                # update the state to postvote
-                # lock the house, finalize the votes
-            # check game state, 
-                # if game is over, break
-                # else, update the state to day, cleanup
-        pass
+            self.state.change_state(Partition.voting)
+            voting_point = time.time()
+            house = House(self.state)
+            self.communicator.recv_parser_change(house.recv_parser)
+            while time.time() - voting_point < VOTING_PERIOD:
+                # Do nothing, let people vote
+                pass
+        
+            # resync state
+            self.state.change_state(Partition.postvote)
+            self.communicator.recv_parser_change(self.state.recv_parser)
+            # distribute delta among peers
+            state_delta = self.state.dump_delta()
+            self.communicator.socket_send_all(state_delta)
+
+            # let all peers catchup
+            print("Waiting for peers to catch up...")
+            time.sleep(5)
+            print("Done")
+
+            self.state.sync_delta()
+        # if we out of the loop, game is over
+        _, result = self.state.is_over()
+        if result == Role.vampire:
+            print("Vampires won!")
+        else:
+            print("Villagers won!")
+
 
     def listen_user(self):
         ### listens the inputs from the user

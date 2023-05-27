@@ -9,3 +9,6 @@ def parse_ip_addr():
         if cur[1]=="inet":
             ip_list.append({"interface": cur[0], "ip": cur[2].split("/")[0]})
     return ip_list
+    
+def build_id(ip: str, name: str) -> str:
+    return f"{ip}-{name}"

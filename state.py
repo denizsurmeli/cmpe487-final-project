@@ -4,6 +4,7 @@ Definitions and functionalities of the roles, the game state etc.
 
 import threading
 import enum
+from utility import parse_role, build_id
 
 class Role(enum.Enum):
     vampire = 1
@@ -24,15 +25,19 @@ def parse_role(role: str) -> Role:
         return Role.doctor
     else:
         return Role.villager
-    
+
+
 class Player: 
     def __init__(self, data: dict):
+        # In the dictionary, it's absolutely necessary to have ip and name, but role is optional
         self.ip = data["ip"]
-        self.id = data["id"] # TODO: Maybe we won't need this, wrapping up just in case. 
         self.name = data["name"]
+        self.id = build_id(self.ip, self.name)
         # TODO: Do we need to remove these ?
-        self.role = parse_role(data["role"])
-        self.key = data["key"]
+        if "role" in data.keys():
+            self.role = parse_role(data["role"])
+        else:
+            self.role = None
 
     def __eq__(self, other):
         return self.ip == other.ip and self.id == other.id
@@ -114,6 +119,7 @@ class State:
                 self.round += 1
 
     def dump_state_change(self):
+        # If the game in voting stage, show who killed an saved last night.
         if self.partition == Partition.voting:
             with self.killed_lock, self.saved_lock:
                 dump = {

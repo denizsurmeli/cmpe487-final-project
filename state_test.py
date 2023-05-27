@@ -112,7 +112,7 @@ class TestState(unittest.TestCase):
         self.state.kill(self.state.players[2])
 
         self.state.change_state(Partition.voting)
-        dump = self.state.dump_state_change()
+        dump = self.state.dump_delta()
         self.state.round_cleanup()
 
         for i in range(3, 10):

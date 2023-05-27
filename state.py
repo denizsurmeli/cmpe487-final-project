@@ -16,7 +16,7 @@ class Partition(enum.Enum):
     night = 2
     prevote = 3
     voting = 4
-    end_of_voting = 5
+    postvote = 5
     end = 6
 
 def parse_role(role: str) -> Role:
@@ -76,7 +76,7 @@ class State:
         with self.partition_lock:
             self.partition = partition
     
-    def kill(self, player):
+    def kill(self, player:Player):
         if self.partition == Partition.night:
             with self.killed_lock, self.protected_lock, self.alive_lock:
                 if player not in self.protected.keys():
@@ -89,7 +89,7 @@ class State:
         with self.saved_lock:
             self.saved[player] = True
 
-    def protect(self, player):
+    def protect(self, player:Player):
         if self.partition == Partition.day:
             with self.protected_lock:
                 self.protected[player] = True
@@ -108,7 +108,7 @@ class State:
         
     def round_cleanup(self):
         # Only when voting period ends
-        if self.partition == Partition.end_of_voting:
+        if self.partition == Partition.postvote:
             with self.killed_lock:
                 self.killed = dict()
             with self.saved_lock:

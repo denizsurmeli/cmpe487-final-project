@@ -13,6 +13,7 @@ A mafia (or werewolf) game where there is no need for a server. This game runs i
 - `Vampire`: A participant that tries to kill all koylus. They can vote for killing.
 - `Doctor`: A koylu with special ability that each round, they can select a koylu for protecting that night, so that that night if a vampire attacks the koylu they are protecting, they don't die and the vampire that attacks them is caught. They can vote for killing.
 # Brief Implementation
+For more detailed information, please refer to [ALGORITHM.md](docs/ALGORITHM.md)
 - **Role Distribution** : By definition, initializer has to initialize the game, which means that the role distributor will be that node. Nevertheless, a malign initiator could write a modified code where the initiator knows every other role of players, or even worse, they could manipulate the role distribution mechanism. To keep cheaters away, we implemented a distribution mechanism that each node cannot see other nodes' roles.
     - Initiator initializes the game variables
     - Participants ask to join to the game. If the game is not full, they will be accepted. Otherwise,  they will be rejected.

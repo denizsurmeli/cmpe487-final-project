@@ -1,3 +1,5 @@
+import os
+
 def parse_ip_addr():
     fmsg = os.popen("ip -o addr | awk '/inet/ {print $2, $3, $4}'").read()
     ip_addr_list = fmsg.strip().split("\n")

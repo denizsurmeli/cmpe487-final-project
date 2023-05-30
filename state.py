@@ -202,8 +202,8 @@ class State:
 
         with self.partition_lock,self.delta_lock, self.captured_vampire_count_lock:
             if self.partition in [Partition.prevote, Partition.postvote] and message["type"] == STATE_SYNC["type"]:
-                    self.delta["killed"].append(message["killed"])
-                    self.delta["saved"].append(message["saved"])
+                    self.delta["killed"] += message["killed"]
+                    self.delta["saved"] += message["saved"]
             elif self.partition == Partition.pastvote and message["type"] == VAMPIRE_ACK["type"]:
                 with self.captured_vampire_count_lock:
                     self.captured_vampire_count_lock += 1

@@ -153,6 +153,9 @@ class House:
                 self.broadcasts[vote.voter].append(vote.choice)
         elif vote.medium == "whisper":
             with self.whispers_lock:
+                # TODO: This should never happen
+                if vote.voter not in self.whispers.keys():
+                    self.whispers[vote.voter] = dict()
                 self.whispers[vote.voter][vote.choice] = self.whispers[vote.voter].get(vote.choice, 0) + 1
         else:
             # TODO: This if for debugging purposes, remove later.
@@ -216,6 +219,7 @@ class House:
             return
        
         if message["type"] == "vote":
+            print(message)
             vote = Vote(message)
             self.process_vote(vote)
         else:

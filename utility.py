@@ -61,7 +61,7 @@ def recv_parser(self, message:str, ip:str):
         return
     if message["type"] == "group_chat":
         _from = self.persons[ip]
-        print(f"(group chat){_from.name}: {message['content']}")
+        print(f"(group chat){_from}: {message['content']}")
     elif message["type"] == "private_chat":
         _from = self.persons[ip]
-        print(f"(private chat){_from.name}: {message['content']}")
+        print(f"(private chat){_from}: {message['content']}")

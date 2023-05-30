@@ -87,7 +87,7 @@ class House:
             self.has_voted[player.id] = True
             
         # broadcast the vote
-        self.communicator.socket_send_all(VOTE_MESSAGE)
+        self.communicator.socket_send_all(message)
 
         message["medium"] = "whisper"
         # whisper the vote to all 
@@ -173,9 +173,14 @@ class House:
             if len(votes) > 1:
                 # there are two broadcast votes, go look at the whispers
                 final_votes[id] = max(self.whispers[id], key=self.whispers[id].get)
-            else:
+            elif len(votes) == 1:
                 final_votes[id] = votes[0]
+            else:
+                print(f"No votes casted this round for player with id: {id}.")
 
+        if len(final_votes) == 0:
+            print("ERROR: No votes casted this round for anyone.")
+            return
         aggregated_result = dict() # vote -> count
         for vote in final_votes.values():
             aggregated_result[vote] = aggregated_result.get(vote, 0) + 1
@@ -183,7 +188,6 @@ class House:
         max_count = max(aggregated_result.values())
         candidates = [id for id, count in aggregated_result.items() if count == max_count]
 
-        # TODO: Refactor this
         if len(candidates) < 1:
             with self.state.killed_lock:
                 id = candidates[0]

@@ -61,7 +61,7 @@ class Communicator:
     def socket_send_all(self, msg):
         with self.persons_lock:
             for ip in self.persons.keys():
-                threading.Thread(target=lambda: self.socket_send(ip, msg)).start()
+                threading.Thread(target=lambda: self.socket_send(ip, msg), daemon=True).start()
 
     def broadcast_send(self, msg):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:

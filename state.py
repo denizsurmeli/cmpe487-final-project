@@ -15,8 +15,9 @@ STATE_SYNC = {
     "protected": []
 }
 
-VAMPIRE_ACK = {
-    "type": "vampire_ack",
+DEAD_ACK = {
+    "type": "dead_ack",
+    "role": None,
     "id": None
 }
 
@@ -27,11 +28,12 @@ class Role(enum.Enum):
 
 class Partition(enum.Enum):
     day = 1
-    night = 2
-    prevote = 3
-    voting = 4
-    postvote = 5
-    end = 6
+    prenight = 2
+    night = 3
+    prevote = 4
+    voting = 5
+    postvote = 6
+    end = 7
 
 def parse_role(role: str) -> Role:
     if role == "vampire":
@@ -104,13 +106,25 @@ class State:
 
         # captured vampire count
         self.captured_vampire_count = 0
-        self.captured_vampire_count_lock = threading.Lock()
+        self.captured_vampire_list = []
+        self.captured_vampire_lock = threading.Lock()
+
+        self.wait_partition_event = threading.Event()
 
     def change_state(self, partition: Partition):
         with self.partition_lock:
             self.partition = partition
 
     def sync_delta(self):
+        if self.partition == Partition.prenight:
+            with self.delta_lock:
+                # process the delta
+                for id in self.delta["protected"]:
+                    self.protect(id_to_player(id, self.players))
+                for id in self.delta["killed"]:
+                    self.kill(id_to_player(id, self.players))
+            # We dont want to erase states yet
+            return
         if self.partition == Partition.prevote:
             with self.delta_lock:
                 # process the delta
@@ -127,29 +141,52 @@ class State:
 
         with self.delta_lock:
             self.delta = {"killed":[], "saved":[], "protected":[]}
+
+    def self_live_check(self, player):
+        if player == self.client:
+            # vampire is captured
+            payload = DEAD_ACK.copy()
+            payload["id"] = player.id
+            payload["role"] = player.role.value
+            self.communicator.socket_send_all(payload)
+            print("You have been killed...")
+            if player.role.value == Role.vampire.value:
+                with self.captured_vampire_lock:
+                    self.captured_vampire_count += 1
+                    self.captured_vampire_list.append(player.id)
     
     def kill(self, player:Player):
-        if self.partition == Partition.night:
-            with self.killed_lock, self.protected_lock, self.alive_lock:
-                if player == self.client and player.role == Role.vampire:
-                    # vampire is captured
-                    payload = VAMPIRE_ACK.copy()
-                    payload["id"] = player.id
-                    self.communicator.send_to_all(payload)
+        if self.partition == Partition.night or self.partition == Partition.prevote:
+            with self.protected_lock:
                 if player not in self.protected.keys():
                     print(f"Player {player.id} is killed by the vampire.")
-                    self.killed[player] = True
-                    self.alive[player] = False
+                    with self.killed_lock:
+                        self.killed[player] = True
+                    with self.alive_lock:
+                        self.alive[player] = False
+                    self.self_live_check(player)
                 else:
                     print(f"Player {player.id} is protected by the doctor.")
                     self.save(player)
+
+        elif self.partition == Partition.postvote:
+            with self.killed_lock:
+                self.killed[player] = True
+            with self.alive_lock:
+                self.alive[player] = False
+            self.self_live_check(player)
+        # Only one vote is allowed
+        if self.partition == Partition.night:
+            self.wait_partition_event.wait()
+            self.wait_partition_event.clear()
+
     
     def save(self, player):
         with self.saved_lock:
             self.saved[player] = True
 
     def protect(self, player:Player):
-        if self.partition == Partition.day:
+        if self.partition == Partition.day or self.partition == Partition.prenight:
             with self.protected_lock:
                 self.protected[player] = True
 
@@ -157,11 +194,12 @@ class State:
         # if the number of alive people <= number of alive vampires, vampires win
         with self.alive_lock:
             alive_player_count = len([player for player,state in self.alive.items() if state])
-            print("Alive player count: ", alive_player_count) 
-        if self.captured_vampire_count == self.vampire_count:
+            print("Alive player count: ", alive_player_count)
+            print("Alive vampire count: ", self.vampire_count - self.captured_vampire_count) 
+        if self.captured_vampire_count >= self.vampire_count:
             # all vampires have been caught
             return (True, Role.villager)
-        if alive_player_count <= self.vampire_count - self.captured_vampire_count:
+        if alive_player_count <= 2*(self.vampire_count - self.captured_vampire_count):
             # vampires dominate the village, no chance for villagers to win
             return (True, Role.vampire)
         return (False, None)
@@ -170,10 +208,13 @@ class State:
     def round_cleanup(self):
         # Only when voting period ends
         if self.partition == Partition.postvote:
-            with self.killed_lock, self.saved_lock, self.protected_lock, self.delta_lock:
+            with self.killed_lock:
                 self.killed = dict()
+            with self.saved_lock:
                 self.saved = dict()
+            with self.protected_lock:
                 self.protected = dict()
+            with self.delta_lock:
                 self.delta = {"killed":[], "saved":[], "protected":[]}
             # if game is over, change the state to end else rewind to a new round
             if self.is_over()[0]:
@@ -184,33 +225,33 @@ class State:
 
     def dump_delta(self):
         # If the game is in prevoting stage, show who have been killed and saved last night.
-        if self.partition == Partition.prevote or self.partition == Partition.postvote:
-            with self.killed_lock, self.saved_lock, self.protected_lock, self.delta_lock:
-                delta = STATE_SYNC.copy()
-                delta["killed"] = [player.id for player,state in self.killed.items() if state]
-                delta["saved"] = [player.id for player,state in self.saved.items() if state]
-                delta["protected"] = [player.id for player,state in self.protected.items() if state]
-            return delta
+        with self.killed_lock, self.saved_lock, self.protected_lock, self.delta_lock:
+            delta = STATE_SYNC.copy()
+            delta["killed"] = [player.id for player,state in self.killed.items() if state]
+            delta["saved"] = [player.id for player,state in self.saved.items() if state]
+            delta["protected"] = [player.id for player,state in self.protected.items() if state]
+        return delta
 
 
     def recv_parser(self, message: str, ip: str):
         # only attached when the game is in prevoting stage
         try:
             message = json.loads(message)
-        except:
-            print("FATALERR: Error while unmarshalling the message.")
+        except Exception as e:
+            print("FATALERR: Error while unmarshalling the message:", e, message)
+            return
 
-        with self.partition_lock,self.delta_lock, self.captured_vampire_count_lock:
-            if self.partition in [Partition.prevote, Partition.postvote] and message["type"] == STATE_SYNC["type"]:
+        with self.partition_lock,self.delta_lock, self.captured_vampire_lock:
+            if self.partition in [Partition.prenight, Partition.prevote, Partition.postvote] and message["type"] == STATE_SYNC["type"]:
                     self.delta["killed"] += message["killed"]
                     self.delta["saved"] += message["saved"]
-            elif self.partition == Partition.pastvote and message["type"] == VAMPIRE_ACK["type"]:
-                with self.captured_vampire_count_lock:
-                    self.captured_vampire_count_lock += 1
-                    self.kill(id_to_player(message["id"]))
+                    self.delta["protected"] += message["protected"]
+            elif message["type"] == DEAD_ACK["type"]:
+                if Role(message["role"]).value == Role.vampire.value and message["id"] not in self.captured_vampire_list:
+                    self.captured_vampire_count += 1
+                    self.captured_vampire_list.append(message["id"])
+                print(f"Killed player {message['id']} was a {Role(message['role']).name}")
             elif self.partition not in [Partition.prevote, Partition.postvote] and message["type"] == STATE_SYNC["type"]:
                 print("FATALERR: Received state change while not in prevote or postvote stage.")
-
-
             else:
-                print("FATALERR: Received unknown message type.")
+                print("FATALERR: Received unknown message type:", message)

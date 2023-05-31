@@ -24,7 +24,4 @@ if __name__ == "__main__":
     
     state = State(players, client, comm, counts)
     game = Game(client, comm, state, clock)
-
-    # game.run()
-
-
+    game.run()

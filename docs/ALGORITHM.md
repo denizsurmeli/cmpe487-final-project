@@ -36,5 +36,4 @@
     - Whispers: (peers, dictionary of (voter, whom they whispered of))
 - We first make an intermediate board for the votes, where everyone votes and we keep track of the whispers and broadcasts.
 -If we see that there are some players who have voted for more than one people, they might be mind controlled by the vampire, so we ask each peer about the whispers.
-- After listening the intermediate period, we finalize the votes by looking at the whispers and broadcasts and make the final call for each peer. This updates the state to the final period of voting, the ones that need to be killed are killed etc.
-- In the finalization period of one vote, if there are more than one broadcast for one peer, first, decide for that peer about the vote by looking at the whispers.
+- After listening the intermediate period, we finalize the votes by looking at the whispers and broadcasts and make the final call for each peer.

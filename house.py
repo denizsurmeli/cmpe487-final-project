@@ -191,7 +191,7 @@ class House:
         max_count = max(aggregated_result.values())
         candidates = [id for id, count in aggregated_result.items() if count == max_count]
 
-        if len(candidates) < 1:
+        if len(candidates) <= 1:
             with self.state.killed_lock:
                 id = candidates[0]
                 player = self.id_to_player(id)

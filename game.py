@@ -1,5 +1,6 @@
 import threading
 import time
+import traceback
 
 from communicator import Communicator
 from state import State, Partition, Player, Role, id_to_player
@@ -17,10 +18,10 @@ COMMANDS = {
 
 DAY_PERIOD = 30 # seconds
 NIGHT_PERIOD = 10 # seconds
-VOTING_PERIOD = 30 # seconds
+VOTING_PERIOD = 20 # seconds
 
 
-CATCHUP_PERIOD = 3 # seconds
+CATCHUP_PERIOD = 1 # seconds
 
 class Game:
     def __init__(self, client: Player, communicator: Communicator, state:State, clock:float):
@@ -40,8 +41,26 @@ class Game:
         self.commands["kill"] = self.kill
         self.commands["protect"] = self.protect
 
-        self.user_listener = threading.Thread(target=self.listen_user).start()
-        self.runner = threading.Thread(target=self.run).start()
+        self.user_listener = threading.Thread(target=self.listen_user, daemon=True).start()
+
+    def pre_post_check(self, partition):
+        print(partition.name, "started")
+        # prevote
+        self.state.change_state(partition)
+        self.communicator.recv_parser_change(self.state.recv_parser)
+        time.sleep(CATCHUP_PERIOD)
+        # distribute delta among peers
+        state_delta = self.state.dump_delta()
+        self.communicator.socket_send_all(state_delta)
+        print("sent delta:", state_delta)
+
+        # let all peers catchup
+        print("Waiting for peers to catch up...")
+        time.sleep(CATCHUP_PERIOD)
+        print("Done")
+        self.state.sync_delta()
+        time.sleep(CATCHUP_PERIOD)
+        print(partition.name, "over")
 
 
     def run(self):
@@ -58,6 +77,8 @@ class Game:
                 continue
             print("Day over")
 
+            self.pre_post_check(Partition.prenight)
+
             print("Night started")
             # change the state to night
             self.state.change_state(Partition.night)
@@ -65,22 +86,13 @@ class Game:
             while time.time() - night_point < NIGHT_PERIOD:
                 # Do nothing, let vampires kill
                 continue
+            self.state.wait_partition_event.set()
             print("Night over")
 
-            print("Prevote started")
-            # prevote
-            self.state.change_state(Partition.prevote)
-            self.communicator.recv_parser_change(self.state.recv_parser)
-            # distribute delta among peers 
-            state_delta = self.state.dump_delta()
-            self.communicator.socket_send_all(state_delta)
+            self.pre_post_check(Partition.prevote)
 
-            # let all peers catchup
-            print("Waiting for peers to catch up...")
-            time.sleep(CATCHUP_PERIOD)
-            print("Done")
-            print("Prevote over")
-            self.state.sync_delta()
+            if self.state.is_over()[0]:
+                break
 
             print("Voting started")
             # voting
@@ -97,27 +109,18 @@ class Game:
             print("Voting over")
             house.finalize_table()
 
-            print("Postvote started")
-            # resync state
-            self.state.change_state(Partition.postvote)
-            self.communicator.recv_parser_change(self.state.recv_parser)
-            # distribute delta among peers
-            state_delta = self.state.dump_delta()
-            self.communicator.socket_send_all(state_delta)
+            self.pre_post_check(Partition.postvote)
 
-            # let all peers catchup
-            print("Waiting for peers to catch up...")
-            time.sleep(CATCHUP_PERIOD)
-            print("Done")
-            print("Postvote over")
+            # HOTFIX: house_lock sometimes hangs. 
+            if self.state.is_over()[0]:
+                break
 
-            self.state.sync_delta()
-
-            print("Round over")
             with self.house_lock:
                 self.house = None
 
             self.state.round_cleanup()
+
+            print("Round over")
         # if we are out of the loop, game is over
         _, result = self.state.is_over()
         if result == Role.vampire:
@@ -135,13 +138,16 @@ class Game:
             # 4. Kill
             # 5. Protect
         while True:
-            prompt = input(">>> ")
-            command = prompt.split()[0]
-            if command not in COMMANDS:
-                print("Invalid command.")
-                continue
-            else:
-                self.commands[command](prompt)
+            try:
+                prompt = input(">>> ")
+                command = prompt.split()[0]
+                if command not in COMMANDS:
+                    print("Invalid command.")
+                    continue
+                else:
+                    self.commands[command](prompt)
+            except Exception as e:
+                print("Unexpected error while processing command:", traceback.print_exc())
 
     def send_all(self, prompt):
         ### sends a message to all players

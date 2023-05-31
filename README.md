@@ -35,6 +35,12 @@ If the vote for killing is lower than the skipping vote, there is no effect for 
 - Else, the vampires select the participants they will kill in 15 seconds.
 - After the game phase, the network is available for a new game.
 
+# Notes
+
+Most challenging part was to keep player's role anonymous and secure their role alignment. Fortunately, we were able to secure the role distribution mechanism by our role distribution system. Therefore, cheating to select roles should be impossible now. Unfortunately, our code has some anonymity flaws. While our game phase is completely distributed and p2p as promised, there might be some ways to reveal a user's identity by writing a modified code. But it shouldn't make the game unplayable even if some players decided to cheat.
+
+Please note that while we implemented whispering feature, it is not yet tested.
+
 # How To Run
 To run the game, first install any required packages
 ```
@@ -43,6 +49,37 @@ pip3 install -r requirements.txt
 Then, please start the main.py file from this directory
 ```
 python3 main.py
+```
+
+# How To Play
+What a player can do?
+## 1. Group chat
+To chat, a player has two options:
+```
+send_all message
+```
+This would send the message to all players (group chat)
+```
+send user message
+```
+This would send the message to only the specific player (private chat)
+
+## 2. Vote
+A user can vote to kill a player at voting time. The aim of the game is to capture all vampires, but it is also possible to kill an innocent player
+```
+vote target
+```
+
+## 3. Kill
+A vampire can kill a player at night time. Vampires must earn the count dominancy over the villagers to win the game. If a player is protected, this command will have no effect.
+```
+kill target
+```
+
+## 4. Protect
+A doctor can protect a player from vampires at day time.
+```
+protect target
 ```
 
 ## To run the game in a docker environment

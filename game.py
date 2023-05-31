@@ -52,7 +52,6 @@ class Game:
         # distribute delta among peers
         state_delta = self.state.dump_delta()
         self.communicator.socket_send_all(state_delta)
-        print("sent delta:", state_delta)
 
         # let all peers catchup
         print("Waiting for peers to catch up...")

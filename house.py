@@ -224,7 +224,11 @@ class House:
             return
        
         if message["type"] == "vote":
-            print(message)
+            # gossip to all other peers
+            if message["medium"] == "whisper":
+                for peer in self.communicator.persons.keys():
+                    if peer != ip:
+                        self.communicator.socket_send(peer, message)
             vote = Vote(message)
             self.process_vote(vote)
         else:

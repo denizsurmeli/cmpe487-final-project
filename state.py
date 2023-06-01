@@ -150,7 +150,7 @@ class State:
             payload["role"] = player.role.value
             self.communicator.socket_send_all(payload)
             print("You have been killed...")
-            if player.role.value == Role.vampire.value:
+            if player.role.value == Role.vampire.value and player.id not in self.captured_vampire_list:
                 with self.captured_vampire_lock:
                     self.captured_vampire_count += 1
                     self.captured_vampire_list.append(player.id)
@@ -206,22 +206,20 @@ class State:
                          
         
     def round_cleanup(self):
-        # Only when voting period ends
-        if self.partition == Partition.postvote:
-            with self.killed_lock:
-                self.killed = dict()
-            with self.saved_lock:
-                self.saved = dict()
-            with self.protected_lock:
-                self.protected = dict()
-            with self.delta_lock:
-                self.delta = {"killed":[], "saved":[], "protected":[]}
-            # if game is over, change the state to end else rewind to a new round
-            if self.is_over()[0]:
-                self.change_state(Partition.end)
-            else:
-                self.change_state(Partition.day)
-                self.round += 1
+        with self.killed_lock:
+            self.killed = dict()
+        with self.saved_lock:
+            self.saved = dict()
+        with self.protected_lock:
+            self.protected = dict()
+        with self.delta_lock:
+            self.delta = {"killed":[], "saved":[], "protected":[]}
+        # if game is over, change the state to end else rewind to a new round
+        if self.is_over()[0]:
+            self.change_state(Partition.end)
+        else:
+            self.change_state(Partition.day)
+            self.round += 1
 
     def dump_delta(self):
         # If the game is in prevoting stage, show who have been killed and saved last night.

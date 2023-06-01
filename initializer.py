@@ -108,7 +108,10 @@ STAGE2_KEYEXC_MESSAGE = {
 
 STAGE2_END_MESSAGE = {
     "stage": 2,
-    "type": "end"
+    "type": "end",
+    "vampires": 0,
+    "doctors": 0,
+    "villagers": 0
 }
 
 class Initializer:
@@ -127,6 +130,9 @@ class Initializer:
     def __init__(self, comm: Communicator):
         self.players = []
         self.player_lock = threading.Lock()
+        self.vampires=0
+        self.doctors=0
+        self.villagers=0
         self.stage2 = threading.Event()
         self.answer = threading.Event()
         self.accepted = False
@@ -238,6 +244,9 @@ class Initializer:
                     self.comm.socket_send(player[1], STAGE0_END_MESSAGE)
                 role_list = ["vampire" for _ in range(self.ping_msg["vampire"])] + \
                             ["doctor" for _ in range(self.ping_msg["doctor"])]
+                self.vampires= self.ping_msg["vampire"]
+                self.doctors= self.ping_msg["doctor"]
+                self.villagers= len(self.players)-len(role_list)+1
                 role_list = role_list + ["koylu" for _ in range(len(self.players)-len(role_list)+1)]
                 random.shuffle(role_list)
                 self.comm.cleanup_exit.set()
@@ -278,7 +287,7 @@ class Initializer:
             print("Transfers completed:", self.comm.persons, self.comm.ips)
         self.complete.wait()
         print("All completed:", self.role)
-        return self.role
+        return self.role, (self.villagers, self.vampires, self.doctors,)
                 
 
     def recv_parser(self, fmsg, ip):
@@ -426,9 +435,16 @@ class Initializer:
                         self.counter+=1
                         print("Counter:", self.counter)
                         if self.counter >= len(self.players):
+                            message = STAGE2_END_MESSAGE
+                            message["vampires"] = self.vampires
+                            message["doctors"] = self.doctors
+                            message["villagers"] = self.villagers
                             with self.player_lock:
                                 for person in self.players:
-                                    self.comm.socket_send(person[1], STAGE2_END_MESSAGE)
+                                    self.comm.socket_send(person[1], message)
                             self.complete.set()
                 else:
+                    self.vampires = fmsg["vampires"]
+                    self.doctors = fmsg["doctors"]
+                    self.villagers = fmsg["villagers"]
                     self.complete.set()

@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime
 from communicator import Communicator
 from initializer import Initializer
 from state import State, Player, pair_to_player, parse_role
@@ -12,9 +13,9 @@ if __name__ == "__main__":
     comm :Communicator = Communicator(ip, name)
 
     # glock is the global clock distributed among all players
-    role, clock = Initializer(comm).information(), time.time()
-    # TODO: @artun-akdogan: return clock, villager count etc as in here
-    counts = (2,1,1)
+    role, counts = Initializer(comm).information()
+    clock = time.time()
+    print("Game started at:", datetime.fromtimestamp(clock), "with", counts[0], "villagers", counts[1], "vampires, and", counts[2], "doctors.")
     # set client herself
     client = Player({"ip": ip, "name": name, "role": role})
     print(client.role)

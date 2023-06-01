@@ -90,6 +90,7 @@ class House:
         self.communicator.socket_send_all(message)
 
         message["medium"] = "whisper"
+        self.process_vote(Vote(message))
         # whisper the vote to all 
         with self.communicator.persons_lock:
             for ip in self.communicator.persons.keys():
@@ -175,7 +176,11 @@ class House:
         for id, votes in self.broadcasts.items():
             if len(votes) > 1:
                 # there are two broadcast votes, go look at the whispers
-                final_votes[id] = max(self.whispers[id], key=self.whispers[id].get)
+                try:
+                    final_votes[id] = max(self.whispers[id], key=self.whispers[id].get)
+                except Exception as e:
+                    # then this vote is by the vampire, so we can't see the whispers
+                    final_votes[id] = votes[0]
             elif len(votes) == 1:
                 final_votes[id] = votes[0]
             else:

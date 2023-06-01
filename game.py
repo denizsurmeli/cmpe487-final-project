@@ -85,13 +85,15 @@ class Game:
             while time.time() - night_point < NIGHT_PERIOD:
                 # Do nothing, let vampires kill
                 continue
-            self.state.wait_partition_event.set()
             print("Night over")
 
             self.pre_post_check(Partition.prevote)
+            self.state.wait_partition_event.set()
 
             if self.state.is_over()[0]:
                 break
+            
+            self.state.round_cleanup()
 
             print("Voting started")
             # voting

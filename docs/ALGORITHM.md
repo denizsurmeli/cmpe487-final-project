@@ -11,29 +11,21 @@
 
 
 # The Game Logic
-
+There are practically three stages that the user deals with. Each stage can be stated briefly as follows:
 - State: Day
-    - Communicate
-    - Select the saved ones
-        - Update the protected list
+    - Communicate with others. 
+    - Select the saved ones.
 - State: Night
-    - Vampires target the ones they want to kill
-        - Update the killed list
-        - Update the saved list
+    - Vampires target the ones they want to kill.
 - State: Voting
-    - Update the killed list
-- If not end
-    - Publish the state update
-    - cleanup 
-    - set state to day
-- If end
-    - Broadcast the result
+    - Cast votes, select a peer to be killed. 
 
+This logic obviously over simplified here but this is the heart of it really.
 
 ## Voting Logic
 - You practically vote as is:
-    - Broadcasts: (voter, heard votes, simply a list is sufficient)
-    - Whispers: (peers, dictionary of (voter, whom they whispered of))
+    - Broadcasts
+    - Whispers
 - We first make an intermediate board for the votes, where everyone votes and we keep track of the whispers and broadcasts.
 - The whispers are propagated immediately by the voter, they first broadcast to all, then whisper each player one-by-one.
 - After listening the intermediate period, we finalize the votes by looking at the whispers and broadcasts and make the final call for each peer.

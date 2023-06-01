@@ -41,6 +41,17 @@ Most challenging part was to keep player's role anonymous and secure their role 
 
 Please note that while we implemented whispering feature, it is not yet tested.
 
+# The Wrap-Up
+In this project, we have implemented the infamous mafia game as a multiplayer decentralized game. The game requires a minimum of 3 players and has three roles: villager, vampire, and doctor. The objective for the vampires is to dominate the game by killing villagers and doctors, while the villagers try to identify who the vampire is. The doctor has the additional ability to protect villagers from being killed by the vampire.
+
+Implementing the game in a decentralized manner posed several challenges. One of the main challenges was the role distribution problem, as there is no centralized trusted entity. To address this, we developed a role distribution system that ensures anonymity and secures the role alignment. By doing so, cheating to select roles should be impossible. However, we acknowledge that there may still be ways to reveal a user's identity by modifying the code. Nonetheless, this should not render the game unplayable even if some players decide to cheat.
+
+Synchronization among the nodes was another significant challenge. In order to keep all nodes in sync at each stage of the game, we employed gossip mechanisms. Whenever there is a state change, such as voting or killing, the information is buffered before being distributed to all peers. This ensures that the knowledge is not known before the next stage, even if there was an oracle that could decrypt the messages. While we have not implemented encryption for state changes, this approach still secures the integrity of the game.
+
+Lastly, we tackled the voting mechanism. Each node casts a vote, but vampires have the special skill of broadcasting votes for other players. This introduces the potential for exploitation, so peers need to reach consensus about the broadcasts from the same peer. We have two types of votes: broadcasts and whispers. Whispers are utilized only when there are multiple broadcasts for one peer in a voting period. Peers gossip with each other through whispers, sharing information about whom they have voted for. Then, during each change synchronization, decisions are made based on whispers if there are multiple broadcasts.
+
+Overall, while implementing the mafia game in a decentralized manner presented challenges, we have addressed the role distribution problem, ensured synchronization among nodes, and implemented a consensus mechanism for voting. These efforts aim to create an engaging and fair gameplay experience in a decentralized environment.
+
 # How To Run
 To run the game, first install any required packages
 ```
